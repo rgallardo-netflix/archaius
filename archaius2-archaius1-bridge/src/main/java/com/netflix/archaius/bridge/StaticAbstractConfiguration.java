@@ -11,6 +11,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
+import com.netflix.config.util.InstrumentationAware;
 import org.apache.commons.configuration.AbstractConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.event.ConfigurationEvent;
@@ -27,7 +28,7 @@ import com.netflix.config.PropertyListener;
  * @see StaticArchaiusBridgeModule
  */
 @Singleton
-public class StaticAbstractConfiguration extends AbstractConfiguration implements AggregatedConfiguration, DynamicPropertySupport {
+public class StaticAbstractConfiguration extends AbstractConfiguration implements AggregatedConfiguration, DynamicPropertySupport, InstrumentationAware {
     
     private static volatile AbstractConfigurationBridge delegate;
     
@@ -141,6 +142,16 @@ public class StaticAbstractConfiguration extends AbstractConfiguration implement
             return null;
         }
         return delegate.getProperty(key);
+    }
+
+    @Override
+    public Object getPropertyUninstrumented(String key) {
+        if (delegate == null) {
+            System.out.println(
+                    "[getPropertyUninstrumented(" + key + ")] StaticAbstractConfiguration not initialized yet.");
+            return null;
+        }
+        return delegate.getPropertyUninstrumented(key);
     }
 
     @Override
