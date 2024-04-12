@@ -48,19 +48,16 @@ public class PrefixedViewConfig extends AbstractDependentConfig {
         @Override
         public void onSourceConfigAdded(PrefixedViewConfig pvc, Config config) {
             pvc.updateState(config);
-            pvc.notifyConfigAdded(pvc);
         }
 
         @Override
         public void onSourceConfigRemoved(PrefixedViewConfig pvc, Config config) {
             pvc.updateState(config);
-            pvc.notifyConfigRemoved(pvc);
         }
 
         @Override
         public void onSourceConfigUpdated(PrefixedViewConfig pvc, Config config) {
             pvc.updateState(config);
-            pvc.notifyConfigUpdated(pvc);
         }
 
         @Override
