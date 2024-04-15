@@ -28,6 +28,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.netflix.archaius.api.Config;
 import com.netflix.archaius.api.config.SettableConfig;
+import com.netflix.archaius.api.config.CompositeConfig;
 import com.netflix.archaius.config.polling.ManualPollingStrategy;
 import com.netflix.archaius.config.polling.PollingResponse;
 import com.netflix.archaius.instrumentation.AccessMonitorUtil;
@@ -56,10 +57,10 @@ public class CompositeConfigTest {
         Properties props = new Properties();
         props.setProperty("env", "prod");
         
-        com.netflix.archaius.api.config.CompositeConfig libraries = new DefaultCompositeConfig();
-        com.netflix.archaius.api.config.CompositeConfig application = new DefaultCompositeConfig();
+        CompositeConfig libraries = new DefaultCompositeConfig();
+        CompositeConfig application = new DefaultCompositeConfig();
         
-        com.netflix.archaius.api.config.CompositeConfig config = DefaultCompositeConfig.builder()
+        CompositeConfig config = DefaultCompositeConfig.builder()
                 .withConfig("lib", libraries)
                 .withConfig("app", application)
                 .withConfig("set", MapConfig.from(props))
@@ -100,10 +101,10 @@ public class CompositeConfigTest {
         Properties props = new Properties();
         props.setProperty("env", "prod");
         
-        com.netflix.archaius.api.config.CompositeConfig libraries = new DefaultCompositeConfig(true);
-        com.netflix.archaius.api.config.CompositeConfig application = new DefaultCompositeConfig();
+        CompositeConfig libraries = new DefaultCompositeConfig(true);
+        CompositeConfig application = new DefaultCompositeConfig();
         
-        com.netflix.archaius.api.config.CompositeConfig config = DefaultCompositeConfig.builder()
+        CompositeConfig config = DefaultCompositeConfig.builder()
                 .withConfig("lib", libraries)
                 .withConfig("app", application)
                 .withConfig("set", MapConfig.from(props))
@@ -142,7 +143,7 @@ public class CompositeConfigTest {
     @SuppressWarnings("deprecation")
     @Test
     public void getKeysTest() throws ConfigException {
-        com.netflix.archaius.api.config.CompositeConfig composite = new DefaultCompositeConfig();
+        CompositeConfig composite = new DefaultCompositeConfig();
         composite.addConfig("a", EmptyConfig.INSTANCE);
         
         Iterator<String> iter = composite.getKeys();
@@ -167,7 +168,7 @@ public class CompositeConfigTest {
 
     @Test
     public void testGetKeysIteratorRemoveThrows() throws ConfigException {
-        com.netflix.archaius.api.config.CompositeConfig composite = new DefaultCompositeConfig();
+        CompositeConfig composite = new DefaultCompositeConfig();
 
 
         composite.addConfig("d", MapConfig.builder().put("d1", "A").put("d2",  "B").build());
@@ -182,7 +183,7 @@ public class CompositeConfigTest {
 
     @Test
     public void testKeysIterable() throws ConfigException {
-        com.netflix.archaius.api.config.CompositeConfig composite = new DefaultCompositeConfig();
+        CompositeConfig composite = new DefaultCompositeConfig();
 
         composite.addConfig("d", MapConfig.builder().put("d1", "A").put("d2",  "B").build());
         composite.addConfig("e", MapConfig.builder().put("e1", "A").put("e2",  "B").build());
@@ -195,7 +196,7 @@ public class CompositeConfigTest {
 
     @Test
     public void testKeysIterableModificationThrows() throws ConfigException {
-        com.netflix.archaius.api.config.CompositeConfig composite = new DefaultCompositeConfig();
+        CompositeConfig composite = new DefaultCompositeConfig();
 
         composite.addConfig("d", MapConfig.builder().put("d1", "A").put("d2",  "B").build());
         composite.addConfig("e", MapConfig.builder().put("e1", "A").put("e2",  "B").build());
@@ -207,7 +208,7 @@ public class CompositeConfigTest {
     @Test
     public void unusedCompositeConfigIsGarbageCollected() throws ConfigException {
         SettableConfig sourceConfig = new DefaultSettableConfig();
-        com.netflix.archaius.api.config.CompositeConfig config = DefaultCompositeConfig.builder()
+        CompositeConfig config = DefaultCompositeConfig.builder()
                 .withConfig("settable", sourceConfig)
                 .build();
         Reference<Config> weakReference = new WeakReference<>(config);
@@ -220,7 +221,7 @@ public class CompositeConfigTest {
 
     @Test
     public void instrumentationNotEnabled() throws Exception {
-        com.netflix.archaius.api.config.CompositeConfig composite = new DefaultCompositeConfig();
+        CompositeConfig composite = new DefaultCompositeConfig();
 
         composite.addConfig("polling", createPollingDynamicConfig("a1", "1", "b1", "2", null));
 
@@ -231,13 +232,13 @@ public class CompositeConfigTest {
 
     @Test
     public void instrumentationPropagation() throws Exception {
-        com.netflix.archaius.api.config.CompositeConfig composite = new DefaultCompositeConfig();
+        CompositeConfig composite = new DefaultCompositeConfig();
         AccessMonitorUtil accessMonitorUtil = spy(AccessMonitorUtil.builder().build());
 
         PollingDynamicConfig outerPollingDynamicConfig = createPollingDynamicConfig("a1", "1", "b1", "2", accessMonitorUtil);
         composite.addConfig("outer", outerPollingDynamicConfig);
 
-        com.netflix.archaius.api.config.CompositeConfig innerComposite = new DefaultCompositeConfig();
+        CompositeConfig innerComposite = new DefaultCompositeConfig();
         PollingDynamicConfig nestedPollingDynamicConfig = createPollingDynamicConfig("b1", "1", "c1", "3", accessMonitorUtil);
         innerComposite.addConfig("polling", nestedPollingDynamicConfig);
         composite.addConfig("innerComposite", innerComposite);
@@ -281,6 +282,32 @@ public class CompositeConfigTest {
         // The uninstrumented forEachProperty leaves the counts unchanged
         composite.forEachPropertyUninstrumented((k, v) -> {});
         verify(accessMonitorUtil, times(6)).registerUsage((any()));
+    }
+
+    @Test
+    public void instrumentationNestedPrefixedViewConfig() throws Exception {
+        /*
+            CompositeConfig (config)
+                    |
+            PrefixedViewConfig (prefixedConfig)
+                    |
+            PollingDynamicConfig (instrumentedConfig)
+         */
+        AccessMonitorUtil accessMonitorUtil = spy(AccessMonitorUtil.builder().build());
+        PollingDynamicConfig instrumentedConfig =
+                createPollingDynamicConfig("prefix.a1", "1", "b1", "2", accessMonitorUtil);
+        Config prefixedConfig = instrumentedConfig.getPrefixedView("prefix");
+        CompositeConfig config = new DefaultCompositeConfig();
+        config.addConfig("prefixedConfig", prefixedConfig);
+
+        assertEquals("1", config.getRawProperty("a1"));
+        verify(accessMonitorUtil).registerUsage(eq(new PropertyDetails("prefix.a1", "prefix.a1", "1")));
+
+        assertEquals("1", config.getRawPropertyUninstrumented("a1"));
+        verify(accessMonitorUtil, times(1)).registerUsage(any());
+
+        assertNull(config.getRawProperty("b1"));
+        verify(accessMonitorUtil, times(1)).registerUsage(any());
     }
 
     private PollingDynamicConfig createPollingDynamicConfig(

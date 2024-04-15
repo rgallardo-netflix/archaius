@@ -78,7 +78,7 @@ public abstract class AbstractDependentConfig extends AbstractConfig {
     @Override
     public void recordUsage(PropertyDetails propertyDetails) {
         if (getState().getInstrumentedKeys().containsKey(propertyDetails.getKey())) {
-            getState().getInstrumentedKeys().get(propertyDetails.getKey()).recordUsage(propertyDetails);
+            getState().getInstrumentedKeys().get(propertyDetails.getKey()).recordUsage(createPropertyDetails(propertyDetails.getKey(), propertyDetails.getValue()));
         }
     }
 
