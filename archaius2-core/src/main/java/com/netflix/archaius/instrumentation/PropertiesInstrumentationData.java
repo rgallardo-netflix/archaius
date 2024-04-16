@@ -9,8 +9,7 @@ public class PropertiesInstrumentationData {
     private final Map<String, String> scopes;
 
     public PropertiesInstrumentationData(Map<String, PropertyUsageData> idToUsageDataMap) {
-        this.idToUsageDataMap = idToUsageDataMap;
-        scopes = new HashMap<>();
+        this(idToUsageDataMap, new HashMap<>());
     }
 
     public PropertiesInstrumentationData(Map<String, PropertyUsageData> idToUsageDataMap, Map<String, String> scopes) {
