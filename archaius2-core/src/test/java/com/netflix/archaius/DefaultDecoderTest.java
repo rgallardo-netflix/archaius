@@ -15,7 +15,7 @@
  */
 package com.netflix.archaius;
 
-
+import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URI;
@@ -28,65 +28,138 @@ import java.time.OffsetDateTime;
 import java.time.OffsetTime;
 import java.time.Period;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Currency;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.reflect.TypeToken;
+import com.netflix.archaius.api.Decoder;
+import com.netflix.archaius.api.TypeConverter;
+import com.netflix.archaius.converters.ArrayTypeConverterFactory;
+import com.netflix.archaius.converters.EnumTypeConverterFactory;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 public class DefaultDecoderTest {
+    private static final Type collectionOfLongType = new TypeToken<Collection<Long>>() {}.getType();
+    private static final Type listOfIntegerType = new TypeToken<List<Integer>>() {}.getType();
+    private static final Type setOfLongType = new TypeToken<Set<Long>>() {}.getType();
+    private static final Type mapofStringToIntegerType = new TypeToken<Map<String, Integer>>() {}.getType();
+
     @Test
     public void testJavaNumbers() {
         DefaultDecoder decoder = DefaultDecoder.INSTANCE;
         
         boolean flag = decoder.decode(boolean.class, "true");
-        Assert.assertTrue(flag);
-        int int_value = decoder.decode(int.class, "123");
-        Assert.assertEquals(123, int_value);
+        assertTrue(flag);
+        int intValue = decoder.decode(int.class, "123");
+        assertEquals(123, intValue);
 
-        Assert.assertEquals(Byte.valueOf(Byte.MAX_VALUE), decoder.decode(Byte.class, String.valueOf(Byte.MAX_VALUE)));
-        Assert.assertEquals(Short.valueOf(Short.MAX_VALUE), decoder.decode(Short.class, String.valueOf(Short.MAX_VALUE)));
-        Assert.assertEquals(Long.valueOf(Long.MAX_VALUE), decoder.decode(Long.class, String.valueOf(Long.MAX_VALUE)));
-        Assert.assertEquals(Integer.valueOf(Integer.MAX_VALUE), decoder.decode(Integer.class, String.valueOf(Integer.MAX_VALUE)));
-        Assert.assertEquals(Float.valueOf(Float.MAX_VALUE), decoder.decode(Float.class, String.valueOf(Float.MAX_VALUE)));
-        Assert.assertEquals(Double.valueOf(Double.MAX_VALUE), decoder.decode(Double.class, String.valueOf(Double.MAX_VALUE)));
-        Assert.assertEquals(BigInteger.valueOf(Long.MAX_VALUE), decoder.decode(BigInteger.class, String.valueOf(Long.MAX_VALUE)));
-        Assert.assertEquals(BigDecimal.valueOf(Double.MAX_VALUE), decoder.decode(BigDecimal.class, String.valueOf(Double.MAX_VALUE)));
-        Assert.assertEquals(new AtomicInteger(Integer.MAX_VALUE).intValue(), decoder.decode(AtomicInteger.class, String.valueOf(Integer.MAX_VALUE)).intValue());
-        Assert.assertEquals(new AtomicLong(Long.MAX_VALUE).longValue(), decoder.decode(AtomicLong.class, String.valueOf(Long.MAX_VALUE)).longValue());
+        assertEquals(Byte.valueOf(Byte.MAX_VALUE), decoder.decode(Byte.class, String.valueOf(Byte.MAX_VALUE)));
+        assertEquals(Short.valueOf(Short.MAX_VALUE), decoder.decode(Short.class, String.valueOf(Short.MAX_VALUE)));
+        assertEquals(Long.valueOf(Long.MAX_VALUE), decoder.decode(Long.class, String.valueOf(Long.MAX_VALUE)));
+        assertEquals(Integer.valueOf(Integer.MAX_VALUE), decoder.decode(Integer.class, String.valueOf(Integer.MAX_VALUE)));
+        assertEquals(Float.valueOf(Float.MAX_VALUE), decoder.decode(Float.class, String.valueOf(Float.MAX_VALUE)));
+        assertEquals(Double.valueOf(Double.MAX_VALUE), decoder.decode(Double.class, String.valueOf(Double.MAX_VALUE)));
+        assertEquals(BigInteger.valueOf(Long.MAX_VALUE), decoder.decode(BigInteger.class, String.valueOf(Long.MAX_VALUE)));
+        assertEquals(BigDecimal.valueOf(Double.MAX_VALUE), decoder.decode(BigDecimal.class, String.valueOf(Double.MAX_VALUE)));
+        assertEquals(Integer.MAX_VALUE, decoder.decode(AtomicInteger.class, String.valueOf(Integer.MAX_VALUE)).get());
+        assertEquals(Long.MAX_VALUE, decoder.decode(AtomicLong.class, String.valueOf(Long.MAX_VALUE)).get());
     }
     
     @Test
     public void testJavaDateTime() {
         DefaultDecoder decoder = DefaultDecoder.INSTANCE;
         
-        Assert.assertEquals(Duration.parse("PT20M30S"), decoder.decode(Duration.class, "PT20M30S"));
-        Assert.assertEquals(Period.of(1, 2, 25), decoder.decode(Period.class, "P1Y2M3W4D"));
-        Assert.assertEquals(OffsetDateTime.parse("2016-08-03T10:15:30+07:00"), decoder.decode(OffsetDateTime.class, "2016-08-03T10:15:30+07:00"));
-        Assert.assertEquals(OffsetTime.parse("10:15:30+18:00"), decoder.decode(OffsetTime.class, "10:15:30+18:00"));
-        Assert.assertEquals(ZonedDateTime.parse("2016-08-03T10:15:30+01:00[Europe/Paris]"), decoder.decode(ZonedDateTime.class, "2016-08-03T10:15:30+01:00[Europe/Paris]"));
-        Assert.assertEquals(LocalDateTime.parse("2016-08-03T10:15:30"), decoder.decode(LocalDateTime.class, "2016-08-03T10:15:30"));
-        Assert.assertEquals(LocalDate.parse("2016-08-03"), decoder.decode(LocalDate.class, "2016-08-03"));
-        Assert.assertEquals(LocalTime.parse("10:15:30"), decoder.decode(LocalTime.class, "10:15:30"));
-        Assert.assertEquals(Instant.from(OffsetDateTime.parse("2016-08-03T10:15:30+07:00")), decoder.decode(Instant.class, "2016-08-03T10:15:30+07:00"));
+        assertEquals(Duration.parse("PT20M30S"), decoder.decode(Duration.class, "PT20M30S"));
+        assertEquals(Period.of(1, 2, 25), decoder.decode(Period.class, "P1Y2M3W4D"));
+        assertEquals(OffsetDateTime.parse("2016-08-03T10:15:30+07:00"), decoder.decode(OffsetDateTime.class, "2016-08-03T10:15:30+07:00"));
+        assertEquals(OffsetTime.parse("10:15:30+18:00"), decoder.decode(OffsetTime.class, "10:15:30+18:00"));
+        assertEquals(ZonedDateTime.parse("2016-08-03T10:15:30+01:00[Europe/Paris]"), decoder.decode(ZonedDateTime.class, "2016-08-03T10:15:30+01:00[Europe/Paris]"));
+        assertEquals(LocalDateTime.parse("2016-08-03T10:15:30"), decoder.decode(LocalDateTime.class, "2016-08-03T10:15:30"));
+        assertEquals(LocalDate.parse("2016-08-03"), decoder.decode(LocalDate.class, "2016-08-03"));
+        assertEquals(LocalTime.parse("10:15:30"), decoder.decode(LocalTime.class, "10:15:30"));
+        assertEquals(Instant.from(OffsetDateTime.parse("2016-08-03T10:15:30+07:00")), decoder.decode(Instant.class, "2016-08-03T10:15:30+07:00"));
         Date newDate = new Date();
-        Assert.assertEquals(newDate, decoder.decode(Date.class, String.valueOf(newDate.getTime())));
+        assertEquals(newDate, decoder.decode(Date.class, String.valueOf(newDate.getTime())));
     }
     
     @Test
     public void testJavaMiscellaneous() throws DecoderException {
         DefaultDecoder decoder = DefaultDecoder.INSTANCE;
-        Assert.assertEquals(Currency.getInstance("USD"), decoder.decode(Currency.class, "USD"));
-        Assert.assertEquals(BitSet.valueOf(Hex.decodeHex("DEADBEEF00DEADBEEF")), decoder.decode(BitSet.class, "DEADBEEF00DEADBEEF"));
-        Assert.assertEquals("testString", decoder.decode(String.class, "testString"));
-        Assert.assertEquals(URI.create("https://netflix.com"), decoder.decode(URI.class, "https://netflix.com"));
-        Assert.assertEquals(Locale.ENGLISH, decoder.decode(Locale.class, "en"));
+        assertEquals(Currency.getInstance("USD"), decoder.decode(Currency.class, "USD"));
+        assertEquals(BitSet.valueOf(Hex.decodeHex("DEADBEEF00DEADBEEF")), decoder.decode(BitSet.class, "DEADBEEF00DEADBEEF"));
+        assertEquals("testString", decoder.decode(String.class, "testString"));
+        assertEquals(URI.create("https://netflix.com"), decoder.decode(URI.class, "https://netflix.com"));
+        assertEquals(Locale.ENGLISH, decoder.decode(Locale.class, "en"));
+    }
+
+    @Test
+    public void testCollections() {
+        Decoder decoder = DefaultDecoder.INSTANCE;
+        assertEquals(Collections.emptyList(), decoder.decode(listOfIntegerType, ""));
+        assertEquals(Arrays.asList(1, 2, 3, 4, 5, 6), decoder.decode(listOfIntegerType, "1,2,3,4,5,6"));
+        assertEquals(Arrays.asList(1L, 2L, 3L, 4L, 5L, 6L), decoder.decode(collectionOfLongType, "1,2,3,4,5,6"));
+        assertEquals(Collections.singleton(2L), decoder.decode(setOfLongType, "2,2,2,2"));
+        assertEquals(Collections.emptyMap(), decoder.decode(mapofStringToIntegerType, ""));
+        assertEquals(Collections.singletonMap("key", 12345), decoder.decode(mapofStringToIntegerType, "key=12345"));
+    }
+
+    @Test
+    public void testArrays() {
+        DefaultDecoder decoder = DefaultDecoder.INSTANCE;
+        assertArrayEquals(new String[] { "foo", "bar", "baz" }, decoder.decode(String[].class, "foo,bar,baz"));
+        assertArrayEquals(new Integer[] {1, 2, 3, 4, 5}, decoder.decode(Integer[].class, "1,2,3,4,5"));
+        assertArrayEquals(new int[] {1, 2, 3, 4, 5}, decoder.decode(int[].class, "1,2,3,4,5"));
+        assertArrayEquals(new Integer[0], decoder.decode(Integer[].class, ""));
+        assertArrayEquals(new int[0], decoder.decode(int[].class, ""));
+        assertArrayEquals(new Long[] {1L, 2L, 3L, 4L, 5L}, decoder.decode(Long[].class, "1,2,3,4,5"));
+        assertArrayEquals(new long[] {1L, 2L, 3L, 4L, 5L}, decoder.decode(long[].class, "1,2,3,4,5"));
+        assertArrayEquals(new Long[0], decoder.decode(Long[].class, ""));
+        assertArrayEquals(new long[0], decoder.decode(long[].class, ""));
+    }
+
+    enum TestEnumType { FOO, BAR, BAZ }
+    @Test
+    public void testEnum() {
+        Decoder decoder = DefaultDecoder.INSTANCE;
+        assertEquals(TestEnumType.FOO, decoder.decode((Type) TestEnumType.class, "FOO"));
+    }
+
+    @Test
+    public void testArrayConverterIgnoresParameterizedType() {
+        Optional<TypeConverter<?>> maybeConverter = ArrayTypeConverterFactory.INSTANCE.get(listOfIntegerType, DefaultDecoder.INSTANCE);
+        assertFalse(maybeConverter.isPresent());
+    }
+
+    @Test
+    public void testEnumConverterIgnoresParameterizedType() {
+        Optional<TypeConverter<?>> maybeConverter = EnumTypeConverterFactory.INSTANCE.get(listOfIntegerType, DefaultDecoder.INSTANCE);
+        assertFalse(maybeConverter.isPresent());
+    }
+
+    @Test
+    public void testTypeConverterRegistry() {
+        assertTrue(DefaultDecoder.INSTANCE.get(Instant.class).isPresent());
+
+        class Foo {}
+        assertFalse(DefaultDecoder.INSTANCE.get(Foo.class).isPresent());
     }
 }

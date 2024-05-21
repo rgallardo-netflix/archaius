@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * An implementation of {@link ParameterizedType} that can represent the collection types that Archaius can
@@ -21,24 +20,24 @@ import java.util.stream.Collectors;
  * @see Config#get(Type, String)
  * @see Config#get(Type, String, Object)
  */
-public class ArchaiusType implements ParameterizedType {
+public final class ArchaiusType implements ParameterizedType {
 
     /** Return a parameterizedType to represent a {@code List<listValuesType>} */
     public static ParameterizedType forListOf(Class<?> listValuesType) {
-        Class<?> maybeWrappedType = PRIMITIVE_WRAPPERS.getOrDefault(listValuesType, listValuesType);
+        Class<?> maybeWrappedType = listValuesType.isPrimitive() ? PRIMITIVE_WRAPPERS.getOrDefault(listValuesType, listValuesType) : listValuesType;
         return new ArchaiusType(List.class, new Class<?>[] { maybeWrappedType });
     }
 
     /** Return a parameterizedType to represent a {@code Set<setValuesType>} */
     public static ParameterizedType forSetOf(Class<?> setValuesType) {
-        Class<?> maybeWrappedType = PRIMITIVE_WRAPPERS.getOrDefault(setValuesType, setValuesType);
+        Class<?> maybeWrappedType = setValuesType.isPrimitive() ? PRIMITIVE_WRAPPERS.getOrDefault(setValuesType, setValuesType) : setValuesType;
         return new ArchaiusType(Set.class, new Class<?>[] { maybeWrappedType });
     }
 
     /** Return a parameterizedType to represent a {@code Map<mapKeysType, mapValuesType>} */
-    public static ParameterizedType forMapOf(Class<?> mapKeysTpe, Class<?> mapValuesType) {
-        Class<?> maybeWrappedKeyType = PRIMITIVE_WRAPPERS.getOrDefault(mapKeysTpe, mapKeysTpe);
-        Class<?> maybeWrappedValuesType = PRIMITIVE_WRAPPERS.getOrDefault(mapValuesType, mapValuesType);
+    public static ParameterizedType forMapOf(Class<?> mapKeysType, Class<?> mapValuesType) {
+        Class<?> maybeWrappedKeyType = mapKeysType.isPrimitive() ? PRIMITIVE_WRAPPERS.getOrDefault(mapKeysType, mapKeysType) : mapKeysType;
+        Class<?> maybeWrappedValuesType = mapValuesType.isPrimitive() ? PRIMITIVE_WRAPPERS.getOrDefault(mapValuesType, mapValuesType) : mapValuesType;
 
         return new ArchaiusType(Map.class, new Class<?>[] {maybeWrappedKeyType, maybeWrappedValuesType});
     }
@@ -74,7 +73,7 @@ public class ArchaiusType implements ParameterizedType {
 
     @Override
     public Type[] getActualTypeArguments() {
-        return typeArguments;
+        return typeArguments.clone();
     }
 
     @Override
@@ -89,7 +88,38 @@ public class ArchaiusType implements ParameterizedType {
 
     @Override
     public String toString() {
-        String typeArgumentNames = Arrays.stream(typeArguments).map(Class::getSimpleName).collect(Collectors.joining(","));
-        return String.format("parameterizedType for %s<%s>", rawType.getSimpleName(), typeArgumentNames);
+        StringBuilder sb = new StringBuilder(rawType.getName());
+        sb.append('<');
+        boolean first = true;
+        for (Type t : typeArguments) {
+            if (!first) {
+                sb.append(", ");
+            }
+            sb.append(t.getTypeName());
+            first = false;
+        }
+        sb.append('>');
+        return sb.toString();
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(typeArguments) ^ rawType.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        } else if (obj == null) {
+            return false;
+        } else if (!(obj instanceof ParameterizedType)) {
+            return false;
+        }
+
+        ParameterizedType other = (ParameterizedType) obj;
+        return other.getOwnerType() == null &&
+                Objects.equals(rawType, other.getRawType()) &&
+                Arrays.equals(typeArguments, other.getActualTypeArguments());
     }
 }

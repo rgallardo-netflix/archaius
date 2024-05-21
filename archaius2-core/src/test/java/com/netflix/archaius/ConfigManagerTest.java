@@ -15,16 +15,20 @@
  */
 package com.netflix.archaius;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.util.concurrent.atomic.AtomicReference;
+
 import com.netflix.archaius.api.Property;
 import com.netflix.archaius.api.PropertyFactory;
 import com.netflix.archaius.config.DefaultCompositeConfig;
-import org.junit.Test;
 
 import com.netflix.archaius.config.MapConfig;
 import com.netflix.archaius.api.config.CompositeConfig;
 import com.netflix.archaius.config.DefaultSettableConfig;
 import com.netflix.archaius.api.exceptions.ConfigException;
 import com.netflix.archaius.property.DefaultPropertyListener;
+import org.junit.jupiter.api.Test;
 
 public class ConfigManagerTest {
     @Test
@@ -39,19 +43,26 @@ public class ConfigManagerTest {
                         .put("region", "us-east")
                         .put("c",      123)
                         .build()));
-        
-        
+
+
         PropertyFactory factory = DefaultPropertyFactory.from(config);
         
         Property<String> prop = factory.getProperty("abc").asString("defaultValue");
-        
+
+        // Use an AtomicReference to capture the property value change
+        AtomicReference<String> capturedValue = new AtomicReference<>("");
         prop.addListener(new DefaultPropertyListener<String>() {
             @Override
             public void onChange(String next) {
-                System.out.println("Configuration changed : " + next);
+                capturedValue.set(next);
             }
         });
-        
+
+        // Set property which should trigger the listener
         dyn.setProperty("abc", "${c}");
+
+        // Assert that the capturedValue was updated correctly
+        assertEquals("123", capturedValue.get(), "Configuration change did not occur as expected");
+
     }
 }

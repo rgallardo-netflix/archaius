@@ -2,6 +2,8 @@ package com.netflix.archaius.bridge;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+
+import com.netflix.config.util.InstrumentationAware;
 import org.apache.commons.configuration.AbstractConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.HierarchicalConfiguration;
@@ -32,7 +34,7 @@ import javax.inject.Singleton;
  * @see StaticArchaiusBridgeModule
  */
 @Singleton
-class AbstractConfigurationBridge extends AbstractConfiguration implements AggregatedConfiguration, DynamicPropertySupport {
+class AbstractConfigurationBridge extends AbstractConfiguration implements AggregatedConfiguration, DynamicPropertySupport, InstrumentationAware {
 
     private final Config config;
     private final SettableConfig settable;
@@ -92,6 +94,11 @@ class AbstractConfigurationBridge extends AbstractConfiguration implements Aggre
     @Override
     public Object getProperty(String key) {
         return config.getRawProperty(key);  // Should interpolate
+    }
+
+    @Override
+    public Object getPropertyUninstrumented(String key) {
+        return config.getRawPropertyUninstrumented(key);
     }
 
     @Override
