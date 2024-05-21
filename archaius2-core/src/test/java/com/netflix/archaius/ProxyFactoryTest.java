@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.nullValue;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -210,11 +211,24 @@ public class ProxyFactoryTest {
         catch (Exception expected) {
         }
     }
-    
-    interface WithArguments {
+
+    // Known bug: An interface with a default method MUST be public, otherwise proxy creation will fail.
+    public interface WithArguments {
         @PropertyName(name="${0}.abc.${1}")
         @DefaultValue("default")
         String getProperty(String part0, int part1);
+
+        @PropertyName(name="${0}.def.${1}")
+        List<String> getListProperty(String part0, int part1);
+
+        @PropertyName(name="${0}.def.${1}")
+        default List<String> getListWithDefault(String part0, int part1) {
+            return Collections.singletonList(part0 + part1);
+        }
+
+        @PropertyName(name="${0}.def.${1}")
+        @DefaultValue("default1,default2")
+        List<String> getListWithAnnotation(String part0, int part1);
     }
     
     @Test
@@ -222,6 +236,7 @@ public class ProxyFactoryTest {
         SettableConfig config = new DefaultSettableConfig();
         config.setProperty("a.abc.1", "value1");
         config.setProperty("b.abc.2", "value2");
+        config.setProperty("a.def.1", "v1,v2");
         
         PropertyFactory factory = DefaultPropertyFactory.from(config);
         ConfigProxyFactory proxy = new ConfigProxyFactory(config, config.getDecoder(), factory);
@@ -230,6 +245,15 @@ public class ProxyFactoryTest {
         Assert.assertEquals("value1",  withArgs.getProperty("a", 1));
         Assert.assertEquals("value2",  withArgs.getProperty("b", 2));
         Assert.assertEquals("default", withArgs.getProperty("a", 2));
+
+        Assert.assertEquals(Arrays.asList("v1", "v2"), withArgs.getListProperty("a", 1));
+        Assert.assertEquals(Collections.emptyList(), withArgs.getListProperty("b", 2));
+
+        Assert.assertEquals(Arrays.asList("v1", "v2"), withArgs.getListWithDefault("a", 1));
+        Assert.assertEquals(Collections.singletonList("a2"), withArgs.getListWithDefault("a", 2));
+
+        Assert.assertEquals(Arrays.asList("v1", "v2"), withArgs.getListWithAnnotation("a", 1));
+        Assert.assertEquals(Arrays.asList("default1", "default2"), withArgs.getListWithAnnotation("a", 2));
     }
 
     @Configuration(prefix = "foo.bar")
@@ -471,17 +495,27 @@ public class ProxyFactoryTest {
     
     @SuppressWarnings("unused")
     public interface ConfigWithCollectionsWithDefaultValueAnnotation {
-        @DefaultValue("")
+        @DefaultValue("1,2")
         LinkedList<Integer> getLinkedList();
+
+        @DefaultValue("1,2")
+        Set<Long> getSet();
+
+        @DefaultValue("a=b")
+        Map<String, String> getMap();
     }
     
-    @Test(expected=RuntimeException.class)
+    @Test
     public void testCollectionsWithDefaultValueAnnotation() {
         SettableConfig config = new DefaultSettableConfig();
         
         PropertyFactory factory = DefaultPropertyFactory.from(config);
         ConfigProxyFactory proxy = new ConfigProxyFactory(config, config.getDecoder(), factory);
-        proxy.newProxy(ConfigWithCollectionsWithDefaultValueAnnotation.class);
+        ConfigWithCollectionsWithDefaultValueAnnotation withAnnotations = proxy.newProxy(ConfigWithCollectionsWithDefaultValueAnnotation.class);
+
+        Assert.assertEquals(new LinkedList<>(Arrays.asList(1, 2)), withAnnotations.getLinkedList());
+        Assert.assertEquals(new HashSet<>(Arrays.asList(1L, 2L)), withAnnotations.getSet());
+        Assert.assertEquals(Collections.singletonMap("a", "b"), withAnnotations.getMap());
     }
     
     public interface ConfigWithDefaultStringCollections {
@@ -528,7 +562,7 @@ public class ProxyFactoryTest {
         ConfigProxyFactory proxy = new ConfigProxyFactory(config, config.getDecoder(), factory);
         WithArguments withArgs = proxy.newProxy(WithArguments.class);
         
-        Assert.assertEquals("WithArguments[${0}.abc.${1}='default']", withArgs.toString());
+        Assert.assertEquals("WithArguments[${0}.def.${1}='[]',${0}.abc.${1}='default',${0}.def.${1}='null',${0}.def.${1}='[default1, default2]']", withArgs.toString());
         //noinspection ObviousNullCheck
         Assert.assertNotNull(withArgs.hashCode());
         //noinspection EqualsWithItself

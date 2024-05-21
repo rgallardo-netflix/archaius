@@ -135,7 +135,6 @@ public class ConfigProxyFactory {
      * @param decoder Used to parse strings from {@link DefaultValue} annotations into the proper types.
      * @param factory Used to access the config values that are returned by proxies created by this factory.
      */
-    @SuppressWarnings("DIAnnotationInspectionTool")
     @Inject
     public ConfigProxyFactory(Config config, Decoder decoder, PropertyFactory factory) {
         this.decoder = decoder;
@@ -190,7 +189,7 @@ public class ConfigProxyFactory {
     /**
      * Encapsulate the invocation of a single method of the interface
      */
-    interface PropertyValueGetter<T> {
+    protected interface PropertyValueGetter<T> {
         /**
          * Invoke the method with the provided arguments
          */
@@ -285,7 +284,7 @@ public class ConfigProxyFactory {
             final Function defaultValueSupplier;
 
             if (m.getAnnotation(DefaultValue.class) != null) {
-                defaultValueSupplier = createAnnotatedMethodSupplier(m, returnType, config, decoder);
+                defaultValueSupplier = createAnnotatedMethodSupplier(m, m.getGenericReturnType(), config, decoder);
             } else if (m.isDefault()) {
                 defaultValueSupplier = createDefaultMethodSupplier(m, type, proxyObject);
             } else {
@@ -316,7 +315,7 @@ public class ConfigProxyFactory {
                     propertyNameTemplate = nameAnnot.name();
                 }
 
-                propertyValueGetter = createParameterizedProperty(returnType, propertyNameTemplate, defaultValueSupplier);
+                propertyValueGetter = createParameterizedProperty(m.getGenericReturnType(), propertyNameTemplate, defaultValueSupplier);
 
             } else {
                 // Anything else.
@@ -348,15 +347,9 @@ public class ConfigProxyFactory {
 
 
     /** Build a supplier that returns the (interpolated and decoded) value from the method's @DefaultValue annotation */
-    private static <T> Function<Object[], T> createAnnotatedMethodSupplier(Method m, Class<T> returnType, Config config, Decoder decoder) {
+    private static <T> Function<Object[], T> createAnnotatedMethodSupplier(Method m, Type returnType, Config config, Decoder decoder) {
         if (m.isDefault()) {
             throw new IllegalArgumentException("@DefaultValue cannot be defined on a method with a default implementation for method "
-                                               + m.getDeclaringClass().getName() + "#" + m.getName());
-        } else if (
-                Map.class.isAssignableFrom(returnType) ||
-                List.class.isAssignableFrom(returnType) ||
-                Set.class.isAssignableFrom(returnType) ) {
-            throw new IllegalArgumentException("@DefaultValue cannot be used with collections.  Use default method implemenation instead "
                                                + m.getDeclaringClass().getName() + "#" + m.getName());
         }
 
@@ -445,7 +438,7 @@ public class ConfigProxyFactory {
      * into the property name from the method's @PropertyName annotation, then returns the value set in config for the
      * computed property name. If not set, it forwards the call with the same parameters to the defaultValueSupplier.
      */
-    protected <T> PropertyValueGetter<T> createParameterizedProperty(final Class<T> returnType, final String propertyNameTemplate, Function<Object[], T> defaultValueSupplier) {
+    protected <T> PropertyValueGetter<T> createParameterizedProperty(final Type returnType, final String propertyNameTemplate, Function<Object[], T> defaultValueSupplier) {
         LOG.debug("Creating parameterized property `{}` for type `{}`", propertyNameTemplate, returnType);
 
         return args -> {
@@ -467,7 +460,8 @@ public class ConfigProxyFactory {
             String interpolatedPropertyName = new StrSubstitutor(new ArrayLookup<>(args), "${", "}", '$')
                     .replace(propertyNameTemplate);
 
-            T result = propertyRepository.get(interpolatedPropertyName, returnType).get();
+            //noinspection unchecked
+            T result = (T) propertyRepository.get(interpolatedPropertyName, returnType).get();
             if (result == null) {
                 result = defaultValueSupplier.apply(args);
             }
